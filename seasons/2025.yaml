@@ -1,0 +1,32 @@
+# 2025 regulations, the comparison season. "est" = fitted or guessed, not a rule.
+car:
+  mass_min: 800
+  wheelbase: 3.60        # m, max allowed
+  track_width: 1.80      # m, est (overall car width 2.0 m)
+  cg_height: 0.28
+  weight_front: 0.45
+  roll_front: 0.6
+  yaw_inertia: 1100
+  brake_front: 0.60
+aero:
+  corner:   {cl_a: 4.6, cd_a: 1.35}   # est
+  straight: {cl_a: 3.9, cd_a: 1.10}   # DRS open, est
+  balance: 0.42
+  wake: {df_loss: 0.35, drag_cut: 0.30}
+tyres:
+  rim_in: 18
+  grip_scale: 1.0
+  compounds: [soft, medium, hard, inter, wet]
+pu:
+  ice_kw: 620            # est: about 1000 hp total with the MGU-K
+  mguk_kw: 120
+  mguh_kw: 60            # est: MGU-H charge at full throttle, not capped per lap
+  taper_kmh: null
+  battery_mj: 4.0
+  harvest_mj_lap: 2.0
+  deploy_mj_lap: 4.0
+  fuel_flow_mj_h: null   # 100 kg/h flow limit, not simulated
+rules:
+  drs: {gap_s: 1.0}      # straight mode only within 1 s of the car ahead
+  overtake: null
+  two_dry_compounds: true
