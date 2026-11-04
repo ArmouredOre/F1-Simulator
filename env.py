@@ -46,7 +46,7 @@ class RaceEnv:
                  max_time_s=600.0, log=True, wing=None):
         self.trk, self.R = load_track(track), rules.load(season, WING.get(track, 1.0) if wing is None else wing)
         self.n = n_cars
-        self.cond = dict(air_c=26, track_c=42, rain_mm_h=0, wind_ms=0, wind_dir=0, **(conditions or {}))
+        self.cond = {**dict(air_c=26, track_c=42, rain_mm_h=0, wind_ms=0, wind_dir=0), **(conditions or {})}
         self.compounds = [compound] * n_cars if isinstance(compound, str) else list(compound)
         self.max_time, self.logging = max_time_s, log
         self.names = [f"car_{i}" for i in range(n_cars)]
