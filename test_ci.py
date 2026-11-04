@@ -8,6 +8,7 @@ ROOT = pathlib.Path(__file__).parent
 @pytest.mark.parametrize("cmd", [
     ["test_validate.py"],        # validator maths on a synthetic circle
     ["test_env.py"],             # sim sanity gate: 3 clean laps, speeds/g/tyre temps in F1 range
+    ["agents/reference.py"],     # reference lap within 5% of 2024 pole, line no tighter than R 15 m
     ["gate.py", "2025"],         # physics gate: reference lap within 5% of 2024 pole
 ])
 def test_script(cmd):
