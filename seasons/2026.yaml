@@ -1,0 +1,32 @@
+# 2026 regulations. Rule values come from section 3 of the design doc
+# (Motorsport Magazine 2026 tech guide). "est" = fitted or guessed, not a rule.
+car:
+  mass_min: 768          # kg, car + driver
+  wheelbase: 3.40        # m
+  track_width: 1.70      # m, est (overall car width 1.9 m)
+  cg_height: 0.28        # m, est
+  weight_front: 0.45     # est
+  roll_front: 0.6        # share of lateral load transfer on the front axle, est
+  yaw_inertia: 1000      # kg m2, est
+  brake_front: 0.60      # brake bias, est
+aero:                    # about 30% less downforce and 55% less drag (straight mode) than 2025
+  corner:   {cl_a: 2.8, cd_a: 1.25}   # m2, est
+  straight: {cl_a: 1.6, cd_a: 0.62}   # m2, est
+  balance: 0.42          # front share of downforce, est
+  wake: {df_loss: 0.25, drag_cut: 0.30}   # max loss/cut right behind a car, est
+tyres:
+  rim_in: 18
+  grip_scale: 0.97       # est: 25/30 mm narrower front/rear
+  compounds: [soft, medium, hard, inter, wet]
+pu:
+  ice_kw: 400
+  mguk_kw: 350
+  taper_kmh: [290, 345]  # MGU-K power fades to zero between these speeds (from memory)
+  battery_mj: 4.0        # usable store, est
+  harvest_mj_lap: 8.5
+  deploy_mj_lap: null    # no per-lap deploy cap
+  fuel_flow_mj_h: 3000   # not simulated: ice_kw already reflects it
+rules:
+  drs: null              # retired; straight mode is open to everyone in zones
+  overtake: {gap_s: 1.0, extra_mj: 0.5, taper_kmh: [337, 355]}  # taper from memory
+  two_dry_compounds: true  # not enforced until pit stops exist
