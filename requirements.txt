@@ -3,5 +3,6 @@ pandas
 pyarrow
 pyyaml
 scipy
+osqp
 matplotlib
 pytest
