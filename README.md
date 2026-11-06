@@ -42,7 +42,7 @@ Every driver goes through the same `step()` call, whether it's the AI or a human
 
 | Phase | Scope | Status | Gate |
 | --- | --- | --- | --- |
-| 0. Data and reference lap | Track builder, minimum-curvature racing line | Merged. Monza and Silverstone done, Monaco needs FastF1 | Reference lap within 5% of pole: passed (Monza +2.4%, Silverstone +3.0%) |
+| 0. Data and reference lap | Track builder, minimum-curvature racing line | Merged. Monza, Silverstone and Monaco built | Reference lap within 5% of pole: passed (Monza +2.4%, Silverstone +3.0%, Monaco -1.4%) |
 | 1. Physics and conditions | Single-track car, Pacejka tyres with temperature and wear, aero with wake and tow, weather, 2025 and 2026 rules | Merged | Sanity gate passes; overlay on real laps needs FastF1 |
 | 2. RL driver | SAC with randomised conditions. Run 3 is residual RL on top of the scripted gate driver | Training | Beats the reference lap with no crashes across 100 conditions |
 | 3. Multi-car and GUI | Wake and tow, 2-car env, pygame replay viewer, validation plots, keyboard driving | Partly done | Playable at 60 fps; RL overtakes a reference car |
