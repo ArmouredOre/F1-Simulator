@@ -15,10 +15,14 @@ def from_tum(name):
     return x, y, wl, wr, len(x) * 0.25
 
 
+GP = {"spa": "Belgium"}  # FastF1 fuzzy search needs 4+ letters
+FIGURE_EIGHT = {"suzuka"}  # crosses itself, so total turning is 0 rather than 2 pi
+
+
 def from_fastf1(name, year=2024, half_width=4.0):
     # ponytail: pole lap's driven line stands in for the centreline, constant width; swap for a surveyed map if found
     from data import fastest_lap
-    _, tel, _ = fastest_lap(year, name)
+    _, tel, _ = fastest_lap(year, GP.get(name, name))
     x, y = tel.X.values, tel.Y.values
     keep = np.r_[True, np.hypot(np.diff(x), np.diff(y)) > 0.5]
     x, y = x[keep], y[keep]
@@ -55,12 +59,13 @@ def zones(s, kappa, min_len=300):
 
 def make(name):
     t = build(*(from_tum(name) if name in TUM_NAMES else from_fastf1(name)))
-    assert abs(abs(np.sum(t["kappa"]) * (t["s"][1] - t["s"][0])) - 2 * np.pi) < 0.1, "not one closed loop"
+    turn = abs(np.sum(t["kappa"]) * (t["s"][1] - t["s"][0]))
+    assert abs(turn - (0 if name in FIGURE_EIGHT else 2 * np.pi)) < 0.1, "not one closed loop"
     TRACKS.mkdir(exist_ok=True)
     np.savez(TRACKS / f"{name}.npz", **t)
     print(f"{name}: {t['s'][-1]:.0f} m, {len(t['zones'])} straight zones")
 
 
 if __name__ == "__main__":
-    for name in sys.argv[1:] or ["monza", "silverstone", "monaco"]:
+    for name in sys.argv[1:] or ["monza", "silverstone", "monaco", "spa", "suzuka", "bahrain"]:
         make(name)
