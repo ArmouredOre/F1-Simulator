@@ -7,7 +7,7 @@ import physics
 import rules
 import tyres
 from env import WING
-from agents.reference import TRACKS, POLE, min_curvature_line, curvature
+from agents.reference import TRACKS, POLE, R_MIN, MU, CAR, min_curvature_line, curvature
 
 V = np.arange(8.0, 106.0, 4.0)    # m/s
 COND = dict(air_c=26, track_c=42)
@@ -50,7 +50,7 @@ def ggv(R):
 def qss_lap(R, name, env_ggv):
     acc, brk, lat = env_ggv
     t = dict(np.load(TRACKS / f"{name}.npz"))
-    x, y = min_curvature_line(t)
+    x, y = min_curvature_line(t, r_min=R_MIN.get(name, 15.0))
     # ponytail: 15 m smoothing, the QP line has a few unphysically tight spots (R < 10 m, past full lock)
     k = np.convolve(np.abs(np.tile(curvature(x, y), 3)), np.ones(15) / 15, "same")[len(x):2 * len(x)]
     ds = np.hypot(np.roll(x, -1) - x, np.roll(y, -1) - y)
@@ -80,6 +80,7 @@ if __name__ == "__main__":
     errs = []
     for name in sys.argv[2:] or ["monza", "silverstone"]:
         R = rules.load(season, WING.get(name, 1.0))
+        R["tyres"]["grip_scale"] *= MU.get(name, CAR["mu"]) / CAR["mu"]  # low-grip street tarmac, as in agents/reference.py
         lt, v = qss_lap(R, name, ggv(R))
         errs.append((lt - POLE[name]) / POLE[name])
         print(f"  {name:12s} wing {WING.get(name, 1.0)}  qss lap {lt:6.2f} s  2024 pole {POLE[name]:6.2f} s  err {errs[-1]:+.1%}  "
