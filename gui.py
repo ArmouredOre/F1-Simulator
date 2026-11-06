@@ -6,6 +6,7 @@ python gui.py logs/run.parquet --shot out.png --at 30   # headless frame grab
 
 python gui.py --drive monza   # drive a car yourself through RaceEnv
 Keys: up throttle, down brake, left/right steer, Z hold straight mode, X hold overtake, R restart, esc quit.
+Weather (live): 1/2 air temp, 3/4 track temp, 5/6 rain, 7/8 wind (down/up).
 """
 import argparse
 import numpy as np
@@ -18,6 +19,8 @@ SHOW = ["Speed", "nGear", "Throttle", "Brake", "AeroMode", "Overtake", "Battery_
         "TyreTemp_FL", "TyreTemp_FR", "TyreTemp_RL", "TyreTemp_RR",
         "TyreWear_FL", "TyreWear_FR", "TyreWear_RL", "TyreWear_RR",
         "AirTemp", "TrackTemp", "Rainfall", "WindSpeed"]  # shown when present in the log
+WX = {pygame.K_1: ("air_c", -2), pygame.K_2: ("air_c", 2), pygame.K_3: ("track_c", -2), pygame.K_4: ("track_c", 2),
+      pygame.K_5: ("rain_mm_h", -0.5), pygame.K_6: ("rain_mm_h", 0.5), pygame.K_7: ("wind_ms", -1), pygame.K_8: ("wind_ms", 1)}
 
 
 def track_lines(log, npz):
@@ -60,6 +63,7 @@ def fit(lines):
 def drive(a):
     """Keyboard-drive one car in RaceEnv: the sim steps at 10 Hz in real time, the window redraws at 60 fps."""
     from env import RaceEnv
+    from physics import air_density
     env = RaceEnv(track=a.drive, max_time_s=1e9)
     env.reset(seed=0)
     lines, zones = track_lines(None, env.trk)
@@ -76,6 +80,10 @@ def drive(a):
                 return
             if e.type == pygame.KEYDOWN and e.key == pygame.K_r:
                 env.reset(seed=0), env.rows.clear()
+            if e.type == pygame.KEYDOWN and e.key in WX:  # weather keys, applied live
+                key, d = WX[e.key]
+                env.cond[key] = max(0, env.cond[key] + d)
+                env.rho = air_density(env.cond)
         k = pygame.key.get_pressed()
         steer += np.clip(k[pygame.K_LEFT] - k[pygame.K_RIGHT] - steer, -0.08, 0.08)  # ramp so taps are gentle
         if frame % 6 == 0 and not env.done[0]:
@@ -99,6 +107,9 @@ def drive(a):
                     v = r[key]
                     screen.blit(font.render(f"{key:<12}{(f'{v:.2f}' if isinstance(v, float) else str(v)):>10}", True, white), (W - PANEL + 10, y))
                     y += 19
+        for key in ("air_c", "track_c", "rain_mm_h", "wind_ms"):
+            screen.blit(font.render(f"{key:<12}{env.cond[key]:>10.1f}", True, (120, 180, 255)), (W - PANEL + 10, y))
+            y += 19
         if env.done[0]:
             screen.blit(font.render("CRASHED - press R to restart", True, (255, 80, 80)), (W - PANEL + 10, y + 10))
         y += 40
