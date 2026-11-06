@@ -10,10 +10,10 @@ TRACKS = Path(__file__).resolve().parent.parent / "tracks"
 G, RHO = 9.81, 1.2
 # ponytail: one generic 2024-style car, aero level per track (teams do change wings); swap for physics.py once B ships
 CAR = dict(m=805, mu=1.8, p=750e3, vmax=100)
-AERO = dict(monza=(3.0, 0.8), silverstone=(4.5, 1.1), monaco=(5.0, 1.3))  # (ClA, CdA) in m2
+AERO = dict(monza=(3.0, 0.8), silverstone=(4.5, 1.1), monaco=(5.0, 1.3), spa=(3.5, 0.9), suzuka=(4.5, 1.1), bahrain=(4.0, 1.0))  # (ClA, CdA) in m2
 R_MIN = dict(monaco=12.0)  # m, line limit; default 15. Monaco's hairpin is too tight for 15 (QP infeasible)
-MU = dict(monaco=1.5)  # default 1.8; Monaco is bumpy, low-grip street tarmac and nobody commits near the walls (fitted to pole)
-POLE = dict(monza=79.327, silverstone=85.819, monaco=70.270)  # 2024 dry pole laps, s
+MU = dict(monaco=1.5, suzuka=1.6, bahrain=1.5)  # default 1.8; Monaco is bumpy, low-grip street tarmac and nobody commits near the walls (fitted to pole)
+POLE = dict(monza=79.327, silverstone=85.819, monaco=70.270, spa=100.562, suzuka=88.197, bahrain=89.165)  # dry pole laps, s (2024; Spa is 2025, as 2024 qualifying was damp)
 
 
 def min_curvature_line(t, step=2, margin=1.0, r_min=15.0):
