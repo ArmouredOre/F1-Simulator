@@ -23,7 +23,9 @@ def add_acc(df):
 
 def fastf1_lap(year, gp, session, driver=None, cache="ff1cache"):
     """Fastest lap of a FastF1 session, converted to the log format at 10 Hz."""
+    import os
     import fastf1
+    os.makedirs(cache, exist_ok=True)  # FastF1 errors if the cache folder is missing
     fastf1.Cache.enable_cache(cache)
     s = fastf1.get_session(year, gp, session)
     s.load(weather=False, messages=False)
