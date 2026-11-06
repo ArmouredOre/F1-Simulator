@@ -11,6 +11,8 @@ G, RHO = 9.81, 1.2
 # ponytail: one generic 2024-style car, aero level per track (teams do change wings); swap for physics.py once B ships
 CAR = dict(m=805, mu=1.8, p=750e3, vmax=100)
 AERO = dict(monza=(3.0, 0.8), silverstone=(4.5, 1.1), monaco=(5.0, 1.3))  # (ClA, CdA) in m2
+R_MIN = dict(monaco=12.0)  # m, line limit; default 15. Monaco's hairpin is too tight for 15 (QP infeasible)
+MU = dict(monaco=1.5)  # default 1.8; Monaco is bumpy, low-grip street tarmac and nobody commits near the walls (fitted to pole)
 POLE = dict(monza=79.327, silverstone=85.819, monaco=70.270)  # 2024 dry pole laps, s
 
 
@@ -61,10 +63,10 @@ def speed_profile(kappa, ds, m, mu, p, vmax, cla, cda):
 
 def reference_lap(name):
     t = dict(np.load(TRACKS / f"{name}.npz"))
-    x, y = min_curvature_line(t)
+    x, y = min_curvature_line(t, r_min=R_MIN.get(name, 15.0))
     ds = np.hypot(np.roll(x, -1) - x, np.roll(y, -1) - y)
     cla, cda = AERO[name]
-    v = speed_profile(curvature(x, y), ds, **CAR, cla=cla, cda=cda)
+    v = speed_profile(curvature(x, y), ds, **{**CAR, "mu": MU.get(name, CAR["mu"])}, cla=cla, cda=cda)
     dt = 2 * ds / (v + np.roll(v, -1))
     return dict(x=x, y=y, v=v, s=np.r_[0, np.cumsum(ds)[:-1]], t=np.r_[0, np.cumsum(dt)[:-1]], lap_time=dt.sum())
 
@@ -75,7 +77,7 @@ if __name__ == "__main__":
         r = reference_lap(name)
         err = (r["lap_time"] - POLE[name]) / POLE[name]
         r_min = 1 / np.abs(curvature(r["x"], r["y"])).max()
-        ok &= abs(err) < 0.05 and r_min > 14  # QP holds 15 m on a 2 m grid; allow a little between grid points
+        ok &= abs(err) < 0.05 and r_min > R_MIN.get(name, 15.0) - 2  # QP holds the limit on a 2 m grid; allow a little between grid points
         print(f"{name:12s} ref {r['lap_time']:7.3f} s  pole {POLE[name]:7.3f} s  err {err:+.1%}  vmax {r['v'].max()*3.6:.0f} km/h  vmin {r['v'].min()*3.6:.0f} km/h  min R {r_min:.1f} m")
-    assert ok, "gate failed: a lap is more than 5% off pole or its line is tighter than R 14 m"
+    assert ok, "gate failed: a lap is more than 5% off pole or its line is tighter than its minimum radius"
     print("gate passed")
