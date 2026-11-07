@@ -8,6 +8,10 @@ G, ETA, C_RR = 9.81, 0.92, 0.015   # gravity, drivetrain efficiency, rolling res
 MAX_STEER = 0.35                   # rad at the front wheels
 GEAR_KMH = np.array([95, 130, 165, 200, 235, 270, 305, 360.0])  # top speed per gear, cosmetic
 WAKE_LEN, WAKE_W = 50.0, 1.5       # m: wake decays over this distance behind / lateral offset
+CAR_L, CAR_W, WALL = 5.6, 1.9, 3.0  # m: car length and width, run-off from the white line to the barrier
+WRECK_MS, KISS_MS = 30.0, 3.0       # impact speed (m/s) that wrecks a car / that does no damage, est
+GRAVEL_M = 2000.0                   # m driven in the gravel that wrecks a car, est
+DMG_GRIP = 0.4                      # grip lost at full damage, est
 
 
 def air_density(cond):
@@ -26,7 +30,7 @@ def init_state(s, n, v, compounds, cond, R):
                 brk=z.copy(), Ts=np.full((k, 4), 80.0),
                 Tb=np.full((k, 4), 80.0), wear=np.zeros((k, 4)),
                 batt=np.full(k, R["pu"]["battery_mj"] / 2), dep_lap=z.copy(), harv_lap=z.copy(),
-                ot_lap=np.zeros(k, bool), comp=tyres.comp(compounds), compounds=list(compounds))
+                ot_lap=np.zeros(k, bool), dmg=z.copy(), comp=tyres.comp(compounds), compounds=list(compounds))
 
 
 def at(trk, key, s):
@@ -76,6 +80,7 @@ def step(st, steer, thr, brk, straight, deploy_kw, harvest_kw, wk, R, trk, cond,
     Fz = np.maximum(np.stack([Wf / 2 - dlf, Wf / 2 + dlf, Wr / 2 - dlr, Wr / 2 + dlr], 1), 50.0)
     wat = water_mm(cond)
     mu = tyres.mu(st["comp"], Fz, st["Ts"], st["Tb"], st["wear"], wat, R["tyres"]["grip_scale"])
+    mu = mu * (1 - DMG_GRIP * np.clip(st["dmg"], 0, 1))[:, None]
     Fmax = mu * Fz
 
     # longitudinal: power-limited drive on the rears, brake split by bias, both capped by grip
@@ -124,6 +129,50 @@ def step(st, steer, thr, brk, straight, deploy_kw, harvest_kw, wk, R, trk, cond,
     st["dep_lap"] += np.maximum(used, 0)
     st["harv_lap"] += regen
     st.update(ax=ax, ay=ay, delta=delta, thr=thr, brk=brk, Fz=Fz, sdot=sdot)
+
+
+def impact(v):
+    """Damage from a hit at closing speed v (m/s): light touches are free, WRECK_MS ends the race."""
+    return np.maximum(v - KISS_MS, 0) / (WRECK_MS - KISS_MS)
+
+
+def collide(st, trk, dt):
+    """Gravel, barriers and solid cars, once per action step. Adds damage; returns (car contact, wall hit)."""
+    # ponytail: all run-off counts as gravel (tracks have no surface map), add one if tarmac run-off matters
+    L, n = trk["length"], st["n"]
+    w = np.where(n > 0, at(trk, "w_left", st["s"]), at(trk, "w_right", st["s"]))
+    vn = st["vx"] * np.sin(st["xi"]) + st["vy"] * np.cos(st["xi"])   # speed across the track
+    # gravel: all four wheels past the line, slows the car (~0.8 g) and chips damage with distance
+    grav = np.abs(n) > w + 1.0
+    st["dmg"] += grav * st["vx"] * dt / GRAVEL_M
+    st["vx"] = np.where(grav, np.maximum(st["vx"] - 0.8 * G * dt, 0), st["vx"])
+    # barrier: clamp to it, keep only the speed along it, damage from the speed into it
+    wall = np.abs(n) > w + WALL
+    st["dmg"] += wall * impact(np.abs(vn))
+    st["vx"] = np.where(wall, st["vx"] * np.abs(np.cos(st["xi"])), st["vx"])
+    for k in ("xi", "vy", "r"):
+        st[k] = np.where(wall, 0.0, st[k])
+    st["n"] = np.clip(n, -w - WALL, w + WALL)
+    # cars: push overlapping pairs apart along the shallower overlap, equal masses share the speed
+    # ponytail: O(n^2) pairs and no spin from offset hits, fine for a 20-car grid
+    ds = (st["s"][None, :] - st["s"][:, None] + L / 2) % L - L / 2   # [i, j]: how far j is ahead of i
+    dn = st["n"][None, :] - st["n"][:, None]
+    hit = np.zeros(len(n), bool)
+    for i, j in zip(*np.nonzero(np.triu((np.abs(ds) < CAR_L) & (np.abs(dn) < CAR_W), 1))):
+        a, b = (i, j) if ds[i, j] >= 0 else (j, i)                   # b is the car in front
+        if 1 - abs(ds[i, j]) / CAR_L < 1 - abs(dn[i, j]) / CAR_W:    # nose to tail: front car shoved on
+            st["dmg"][[a, b]] += impact(st["vx"][a] - st["vx"][b])
+            st["s"][b] += CAR_L - abs(ds[i, j])                      # only forward, so laps never undo
+            st["vx"][[a, b]] = st["vx"][[a, b]].mean()
+        else:                                                        # side by side: shoved apart across
+            sgn = 1.0 if dn[i, j] >= 0 else -1.0                     # j is left of i
+            st["dmg"][[i, j]] += impact(sgn * (vn[i] - vn[j]))
+            push = (CAR_W - abs(dn[i, j])) / 2 * sgn
+            st["n"][i] -= push
+            st["n"][j] += push
+            st["vy"][[i, j]] = 0.0
+        hit[[i, j]] = True
+    return hit, wall
 
 
 def gear_rpm(v):

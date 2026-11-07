@@ -48,7 +48,7 @@ Every driver goes through the same `step()` call, whether it's the AI or a human
 | 3. Multi-car and GUI | Wake and tow, 2-car env, pygame replay viewer, validation plots, keyboard driving | Partly done | Playable at 60 fps; RL overtakes a reference car |
 | 4. Adaptive rival | Player clone (behaviour cloning, then GAIL), rival trained on a pool of driving styles | Not started | Rival's pass rate rises over sessions |
 | 5. Real-driver styles | Modern drivers: FastF1 style features, fine-tune with a driver id. Legends: hand-tuned action profiles | Not started | Styles are distinct in lap shape and racing |
-| 6. 3D game, built last | Ursina: 3D track from the `.npz`, low-poly car, cameras, HUD, AI cars | Not started | Playable 3D race against the trained rival at 60 fps |
+| 6. 3D game, built last | Godot 4 client for the Python sim over a local socket: 3D track from the `.npz`, Blender car, cameras, HUD, AI cars, weather | Not started | Playable 3D race against the trained rival at 60 fps |
 
 ## Layout
 
