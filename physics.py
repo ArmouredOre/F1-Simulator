@@ -142,10 +142,10 @@ def collide(st, trk, dt):
     L, n = trk["length"], st["n"]
     w = np.where(n > 0, at(trk, "w_left", st["s"]), at(trk, "w_right", st["s"]))
     vn = st["vx"] * np.sin(st["xi"]) + st["vy"] * np.cos(st["xi"])   # speed across the track
-    # gravel: all four wheels past the line, slows the car (~0.8 g) and chips damage with distance
+    # gravel: all four wheels past the line, drag grows with speed (0.8 g above 54 km/h) so you can crawl out
     grav = np.abs(n) > w + 1.0
     st["dmg"] += grav * st["vx"] * dt / GRAVEL_M
-    st["vx"] = np.where(grav, np.maximum(st["vx"] - 0.8 * G * dt, 0), st["vx"])
+    st["vx"] = np.where(grav, np.maximum(st["vx"] - 0.8 * G * np.minimum(1, st["vx"] / 15) * dt, 0), st["vx"])
     # barrier: clamp to it, keep only the speed along it, damage from the speed into it
     wall = np.abs(n) > w + WALL
     st["dmg"] += wall * impact(np.abs(vn))
