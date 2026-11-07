@@ -53,15 +53,18 @@ class Track:
 class Cam:
     def __init__(self, trk):
         self.trk, self.zoom, self.overview, self.at = trk, 6.0, False, trk.mid
+        self.ang, self.cy, self.k = np.pi / 2, H / 2, 1.0  # world direction shown as screen-up, car's screen row, speed zoom
 
     def scale(self):
-        return self.trk.fit if self.overview else self.zoom
+        return self.trk.fit if self.overview else self.zoom * self.k
 
     def px(self, xy):
         """World metres -> screen pixels (works on one point or an (n, 2) array)."""
-        c = self.trk.mid if self.overview else self.at
-        p = (np.asarray(xy) - c) * self.scale()
-        return np.c_[W / 2 + p[..., 0], H / 2 - p[..., 1]] if p.ndim > 1 else (W / 2 + p[0], H / 2 - p[1])
+        ov = self.overview
+        a = 0 if ov else np.pi / 2 - self.ang
+        p = (np.asarray(xy) - (self.trk.mid if ov else self.at)) @ [[np.cos(a), np.sin(a)], [-np.sin(a), np.cos(a)]] * self.scale()
+        cy = H / 2 if ov else self.cy
+        return np.c_[W / 2 + p[..., 0], cy - p[..., 1]] if p.ndim > 1 else (W / 2 + p[0], cy - p[1])
 
     def key(self, e):
         if e.type == pygame.MOUSEWHEEL:
@@ -194,13 +197,15 @@ def setup(trk):
 def drive(a):
     """Keyboard-drive one car in RaceEnv: the sim steps at 10 Hz in real time, the window redraws at 60 fps."""
     from env import RaceEnv
-    from physics import air_density
+    import physics
     env = RaceEnv(track=a.drive, max_time_s=1e9)
     env.reset(seed=0)
     trk = Track(env.trk)
     ghost = best_lap(a.ghost, trk.L) if a.ghost else None
     screen, fonts, cam, (mm, mp), clock = setup(trk)
-    steer, frame, prev = 0.0, 0, None
+    steer, frame = 0.0, 0
+    cam.cy = 0.7 * H  # chase view: car low on screen, pointing up, so left/right keys always match the screen
+    hdg_now = lambda: float(np.arctan2(physics.at(env.trk, "ty", env.st["s"][0]), physics.at(env.trk, "tx", env.st["s"][0])) + env.st["xi"][0])
     # keep the player's laps for the rival's player clone (#11), one file per run
     keep = lambda: env.lap_times[0] and print("saved", env.save_log(f"player_{a.drive}_{time.strftime('%Y%m%d_%H%M%S')}"))
 
@@ -210,23 +215,26 @@ def drive(a):
                 return keep()
             cam.key(e)
             if e.type == pygame.KEYDOWN and e.key == pygame.K_r:
-                keep(), env.reset(seed=0), env.rows.clear()
+                keep(), env.reset(seed=0)
+                frame = 0  # step this frame so there is a row to draw
             if e.type == pygame.KEYDOWN and e.key in WX:  # weather keys, applied live
                 key, d = WX[e.key]
                 env.cond[key] = max(0, env.cond[key] + d)
-                env.rho = air_density(env.cond)
+                env.rho = physics.air_density(env.cond)
         k = pygame.key.get_pressed()
         steer += np.clip(k[pygame.K_LEFT] - k[pygame.K_RIGHT] - steer, -0.08, 0.08)  # ramp so taps are gentle
         if frame % 6 == 0 and not env.done[0]:
-            prev = env.rows[-1] if env.rows else None
+            p0, h0 = (p1, h1) if env.rows else (None, hdg_now())
             lock = min(1.0, 340 / env.st["vx"][0] ** 2)  # full lock only at low speed, a real car steers ~0.1 of it at 200 km/h
             env.step({"car_0": [steer * lock, k[pygame.K_UP] - k[pygame.K_DOWN], k[pygame.K_z], k[pygame.K_x], 0]})
-        # ponytail: the car jumps 10 times a second, interpolate between steps if it looks choppy
-
-        r = env.rows[-1]
-        xy = np.array([r["X"], r["Y"]])
-        hdg = np.arctan2(r["Y"] - prev["Y"], r["X"] - prev["X"]) if prev else 0.0
-        cam.at = xy
+            r = env.rows[-1]
+            p1, h1 = np.array([r["X"], r["Y"]]), hdg_now()
+            p0 = p1 if p0 is None else p0
+        # draw between the last two 10 Hz steps (one step behind) so the car and camera glide at 60 fps
+        f = 1.0 if env.done[0] else (frame % 6) / 6
+        xy, hdg = p0 + (p1 - p0) * f, h0 + ((h1 - h0 + np.pi) % (2 * np.pi) - np.pi) * f
+        cam.at, cam.ang = xy, hdg
+        cam.k += (np.clip(50 / max(r["Speed"] / 3.6, 1), 0.6, 1) - cam.k) * 0.05  # zoom out with speed to see braking points
         lap_t = env.t - env.lap_start[0]
         draw_track(screen, cam)
         if ghost and lap_t < ghost.t[-1]:
@@ -335,6 +343,8 @@ if __name__ == "__main__":
     a = p.parse_args()
     if not (a.log or a.drive):
         p.error("give a log to replay, or --drive TRACK")
+    if a.drive:
+        a.drive = a.drive.split("/")[-1].removesuffix(".npz")  # accept tracks/monza.npz too, not just monza
     if a.log and not a.drive and not a.track:
         p.error("replay needs --track tracks/<name>.npz")
     main(a)
