@@ -85,6 +85,7 @@ class RaceEnv:
         s0 = st["s"].copy()
         for _ in range(SUBSTEPS):
             physics.step(st, steer, thr, brk, mode, dep, harv, self.wk, R, self.trk, self.cond, self.rho, DT)
+        hit, wall = physics.collide(st, self.trk, DT * SUBSTEPS)
         self.t += DT * SUBSTEPS
         progress = st["s"] - s0
 
@@ -100,11 +101,8 @@ class RaceEnv:
 
         w = np.where(st["n"] > 0, physics.at(self.trk, "w_left", st["s"]), physics.at(self.trk, "w_right", st["s"]))
         off = np.abs(st["n"]) > w + 1.0                        # all four wheels past the line
-        crash = (np.abs(st["n"]) > w + 4.0) | (np.abs(st["xi"]) > 1.2)
-        hit = (self.d_ahead < 5.0) & (np.abs(self.dn_ahead) < 1.9)
-        # ponytail: contact only penalises and bleeds the rear car's speed, no impulse model
-        st["vx"] = np.where(hit, np.minimum(st["vx"], st["vx"][self.ahead]), st["vx"])
-        rew = progress / 10.0 - 1.0 * off - 5.0 * hit - 50.0 * (crash & ~self.done)
+        crash = (st["dmg"] >= 1.0) | (np.abs(st["xi"]) > 1.2)       # wrecked or spun
+        rew = progress / 10.0 - 1.0 * off - 5.0 * (hit | wall) - 50.0 * (crash & ~self.done)
         self.done |= crash
         if self.logging:
             self._log(a, mode, ot)
@@ -145,7 +143,7 @@ class RaceEnv:
                        Throttle=st["thr"][i] * 100, Brake=bool(st["brk"][i] > 0), X=x[i], Y=y[i],
                        Distance=st["s"][i], LapNumber=int(self.lap[i]), Steer=st["delta"][i],
                        AccLat=st["ay"][i], AccLong=st["ax"][i], Battery_MJ=st["batt"][i],
-                       AeroMode=int(mode[i]), Overtake=bool(ot[i]), Compound=st["compounds"][i])
+                       Damage=st["dmg"][i], AeroMode=int(mode[i]), Overtake=bool(ot[i]), Compound=st["compounds"][i])
             for j, wh in enumerate(("FL", "FR", "RL", "RR")):
                 row[f"TyreTemp_{wh}"], row[f"TyreWear_{wh}"] = st["Ts"][i, j], st["wear"][i, j]
             self.rows.append(row)
