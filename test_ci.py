@@ -11,6 +11,7 @@ ROOT = pathlib.Path(__file__).parent
     ["test_collide.py"],         # solid cars, barriers, gravel, damage costs grip
     ["agents/reference.py"],     # reference lap within 5% of 2024 pole, line no tighter than R 15 m
     ["gate.py", "2025"],         # physics gate: reference lap within 5% of 2024 pole
+    ["clone.py"],                # player clone: learns a test player's speeds to within 1% of its lap time
 ])
 def test_script(cmd):
     if not (ROOT / cmd[0]).exists():

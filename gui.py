@@ -1,6 +1,7 @@
 """Top-down 2D lap viewer: follow camera, kerbs and run-off, lap and sector times, optional ghost lap.
 
 python gui.py logs/rl_monza_2026.parquet --track tracks/monza.npz [--ghost logs/gate_monza_2026.parquet]
+python gui.py logs/rl_monza_2026.parquet logs/gate_monza_2026.parquet --track tracks/monza.npz   # race several logs, best laps side by side
 Keys: space pause, up/down playback speed, left/right skip 5 s, tab switch car.
 python gui.py logs/run.parquet --track tracks/monza.npz --shot out.png --at 30   # headless frame grab
 
@@ -156,9 +157,9 @@ def text(screen, font, s, xy, col=WHITE):
     screen.blit(font.render(s, True, col), xy)
 
 
-def hud(screen, fonts, lines, x=10, y=10):
+def hud(screen, fonts, lines, x=10, y=10, w=300):
     """Panel of (text, colour) lines on a translucent box."""
-    box = pygame.Surface((300, 12 + 22 * len(lines)), pygame.SRCALPHA)
+    box = pygame.Surface((w, 12 + 22 * len(lines)), pygame.SRCALPHA)
     box.fill((0, 0, 0, 150))
     screen.blit(box, (x, y))
     for i, (s, col) in enumerate(lines):
@@ -266,13 +267,19 @@ def drive(a):
 def main(a):
     if a.drive:
         return drive(a)
-    log = pd.read_parquet(a.log).sort_values("Time")
+    # several logs race in one window; each car is named after its file
+    log = pd.concat(pd.read_parquet(f).assign(Driver=lambda d, f=f: f.split("/")[-1].removesuffix(".parquet") + (
+        "" if d.Driver.nunique() == 1 else " " + d.Driver)) for f in a.log) if len(a.log) > 1 else pd.read_parquet(a.log[0])
+    log = log.sort_values("Time")
     trk = Track(a.track)
     drivers = list(dict.fromkeys(log.Driver))
     cars = {d: log[log.Driver == d] for d in drivers}
     hdgs = {d: heading(c.X.to_numpy(), c.Y.to_numpy()) for d, c in cars.items()}
     laps = laps_of(log, trk.L)
     ghost = best_lap(a.ghost, trk.L) if a.ghost else None
+    tower = sorted((min(lp.t[-1] for lp in laps[d].values()), d) for d in drivers if d in laps)  # best lap per car
+    tower = [(f"{d[:17]:17} {fmt(b)}" + (f" +{b - tower[0][0]:.2f}" if i else ""), COLORS[drivers.index(d) % len(COLORS)])
+             for i, (b, d) in enumerate(tower)]
     screen, fonts, cam, (mm, mp), clock = setup(trk)
     t, t_end, rate, paused, follow = a.at, log.Time.max(), 1.0, False, 0
 
@@ -318,6 +325,8 @@ def main(a):
         lines += [(f"last  {fmt(lap_list[-1])}", WHITE), (f"best  {fmt(min(lap_list))}", (200, 120, 255))] if lap_list else []
         lines += [(f"ghost {fmt(ghost.t[-1])}", (200, 200, 255))] if ghost else []
         hud(screen, fonts, lines)
+        if len(tower) > 1:
+            hud(screen, fonts, [("best laps", WHITE)] + tower, W - 400, 240, 390)
         dash(screen, fonts, r.Speed, r.nGear, r.Throttle / 100, float(r.Brake))
         screen.blit(mm, (W - 230, 10))
         for i, row in enumerate(rows.values()):
@@ -334,7 +343,7 @@ def main(a):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("log", nargs="?", help="telemetry parquet to replay (not needed with --drive)")
+    p.add_argument("log", nargs="*", help="telemetry parquet(s) to replay (not needed with --drive)")
     p.add_argument("--drive", metavar="TRACK", help="drive this track yourself, e.g. monza")
     p.add_argument("--track", help="tracks/<name>.npz (required for replay)")
     p.add_argument("--ghost", help="parquet log whose best lap is shown as a ghost car")
