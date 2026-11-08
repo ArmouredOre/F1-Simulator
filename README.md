@@ -23,6 +23,8 @@ Keys: up throttle, down brake, left/right steer, Z straight mode, X overtake, R 
 
 Replay a scripted lap: `python test_env.py monza 2026`, then `python gui.py logs/gate_monza_2026.parquet --track tracks/monza.npz`. `train.py` also needs `stable-baselines3`.
 
+Compare laps: `python gui.py logs/rl_monza_2026.parquet logs/gate_monza_2026.parquet --track tracks/monza.npz` races both logs in one window with a best-lap board. Ghost you: after a few laps in drive mode, `python clone.py monza` learns your speed at every metre and writes `logs/clone_monza_2026.parquet`.
+
 ## Architecture
 
 ```
@@ -55,6 +57,7 @@ Every driver goes through the same `step()` call, whether it's the AI or a human
 ```
 data.py  track.py  physics.py  tyres.py  rules.py  env.py   # data and sim core
 agents/reference.py  train.py  gate.py                      # reference line, RL driver, scripted gate driver
+clone.py                                                    # player clone ("ghost you") for the rival
 gui.py  validate.py                                         # viewer, keyboard driving, sim vs real overlay
 seasons/  tracks/  test_*.py                                # rules, track files, tests
 ```
