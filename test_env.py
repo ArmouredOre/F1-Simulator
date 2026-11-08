@@ -5,6 +5,7 @@ import sys
 import numpy as np
 import pandas as pd
 import physics
+import tyres
 from env import RaceEnv
 
 
@@ -32,9 +33,18 @@ def speed_profile(env, kappa, mu=1.25):
     return v
 
 
-def drive(env, line_n, v_t):
-    """Pure pursuit on the line, a speed controller that shares grip (friction circle), and TC."""
+def grip(env):
+    """Tyre grip now (water, temperature, wear) relative to warm dry tyres, per car."""
+    st = env.st
+    mu = tyres.mu(st["comp"], tyres.FZ0, st["Ts"], st["Tb"], st["wear"], physics.water_mm(env.cond), 1)
+    return np.minimum((mu / st["comp"]["mu"]).mean(1) / 0.82, 1.0)   # 0.82: warm dry tyres at race temps, est
+
+
+def drive(env, line_n, v_t, thr_trim=1.0):
+    """Pure pursuit on the line, a speed controller that shares grip (friction circle), and TC.
+    Speed target, grip circle and traction cap all scale with the tyres' grip now, so rain slows it down."""
     st, t, L, R = env.st, env.trk, env.trk["length"], env.R
+    g = grip(env)
     m, a = R["car"]["mass_min"], R["aero"]["corner"]
     p_max = (R["pu"]["ice_kw"] + R["pu"]["mguk_kw"]) * 1e3 * physics.ETA
     acts = {}
@@ -44,10 +54,10 @@ def drive(env, line_n, v_t):
         kap = np.interp((s + np.arange(0, ld, 2)) % L, t["s"], t["kappa"]).mean()
         e = 0.5 * kap * ld**2 + np.interp((s + ld) % L, t["s"], line_n) - st["n"][i] - ld * np.sin(st["xi"][i])
         steer = np.arctan(2 * R["car"]["wheelbase"] * e / ld**2) / physics.MAX_STEER
-        vt = np.interp((s + 0.3 * v) % L, t["s"], v_t)
+        vt = np.interp((s + 0.3 * v) % L, t["s"], v_t) * np.sqrt(g[i])
         down = 0.5 * env.rho * a["cl_a"] * v**2
-        spare = np.sqrt(max(0.0, 1 - (st["ay"][i] / (1.5 * (physics.G + down / m))) ** 2))
-        thr_cap = 1.5 * (0.55 * m * physics.G + 0.58 * down) * max(v, 1) / p_max
+        spare = np.sqrt(max(0.0, 1 - (st["ay"][i] / (1.5 * g[i] * (physics.G + down / m))) ** 2))
+        thr_cap = 1.5 * g[i] * thr_trim * (0.55 * m * physics.G + 0.58 * down) * max(v, 1) / p_max
         thr_cap *= np.clip(1 - 20 * (abs(st["vy"][i] / max(v, 1)) - 0.02), 0, 1)
         tb = np.clip(0.5 * (vt - v), -1, min(1, thr_cap)) * spare
         acts[name] = [steer, tb, 1, 1, 1 if st["batt"][i] > 0.5 else -0.5]
