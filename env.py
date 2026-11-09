@@ -50,6 +50,7 @@ class RaceEnv:
         self.compounds = [compound] * n_cars if isinstance(compound, str) else list(compound)
         self.max_time, self.logging = max_time_s, log
         self.names = [f"car_{i}" for i in range(n_cars)]
+        self.substeps = SUBSTEPS   # physics steps per action; 1 = act every physics step
 
     def reset(self, seed=None, v0=50.0):
         self.rng = np.random.default_rng(seed)
@@ -83,10 +84,10 @@ class RaceEnv:
         st["ot_lap"] |= ot
         dep, harv = rules.mguk(R, st["vx"], np.clip(a[:, 4], -1, 1), ot, st)
         s0 = st["s"].copy()
-        for _ in range(SUBSTEPS):
+        for _ in range(self.substeps):
             physics.step(st, steer, thr, brk, mode, dep, harv, self.wk, R, self.trk, self.cond, self.rho, DT)
-        hit, wall = physics.collide(st, self.trk, DT * SUBSTEPS)
-        self.t += DT * SUBSTEPS
+        hit, wall = physics.collide(st, self.trk, DT * self.substeps)
+        self.t += DT * self.substeps
         progress = st["s"] - s0
 
         L = self.trk["length"]

@@ -38,6 +38,13 @@ def at(trk, key, s):
     return trk[key][(np.asarray(s) / trk["ds"]).astype(int) % len(trk[key])]
 
 
+def rubber(st, trk, wat):
+    """Grip factor per car: wet rubber on the dry racing line (trk["rubber_n"], if set) is slippery, up to 15% less."""
+    if wat <= 0 or "rubber_n" not in trk:
+        return np.ones(len(st["s"]))
+    return 1 - 0.15 * min(wat / 0.3, 1) * np.exp(-((st["n"] - at(trk, "rubber_n", st["s"])) / 1.5) ** 2)
+
+
 def wake(st, L):
     """Wake strength 0..1 per car from the nearest car ahead, plus gap to it in s and m."""
     ds = (st["s"][None, :] - st["s"][:, None]) % L   # [i, j]: how far j is ahead of i
@@ -80,6 +87,7 @@ def step(st, steer, thr, brk, straight, deploy_kw, harvest_kw, wk, R, trk, cond,
     Fz = np.maximum(np.stack([Wf / 2 - dlf, Wf / 2 + dlf, Wr / 2 - dlr, Wr / 2 + dlr], 1), 50.0)
     wat = water_mm(cond)
     mu = tyres.mu(st["comp"], Fz, st["Ts"], st["Tb"], st["wear"], wat, R["tyres"]["grip_scale"])
+    mu *= rubber(st, trk, wat)[:, None]
     mu = mu * (1 - DMG_GRIP * np.clip(st["dmg"], 0, 1))[:, None]
     Fmax = mu * Fz
 
