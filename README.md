@@ -23,6 +23,8 @@ Keys: up throttle, down brake, left/right steer, Z straight mode, X overtake, R 
 
 Replay a scripted lap: `python test_env.py monza 2026`, then `python gui.py logs/gate_monza_2026.parquet --track tracks/monza.npz`. `train.py` also needs `stable-baselines3`.
 
+3D game (v1, needs [Godot 4](https://godotengine.org/download)): run `python server.py monza` (add `--rain 2`, `--no-ai`, or `--pro` to turn off the beginner assists: steering and braking help, no damage, Backspace/LB puts you back on track), then `godot --path game` or open `game/` in the Godot editor and press F5. Controller: RT throttle, LT brake, left stick steer, Y DRS, B overtake, RB camera, Start pause, Back restart. Keyboard: W/S/A/D or arrows, F DRS, Space overtake, C camera, P pause, R restart, G beginner guide (racing line: green throttle, yellow lift, red brake), [ and ] steering sensitivity. Drop a Blender car at `game/car.glb` to replace the box car.
+
 Compare laps: `python gui.py logs/rl_monza_2026.parquet logs/gate_monza_2026.parquet --track tracks/monza.npz` races both logs in one window with a best-lap board. Ghost you: after a few laps in drive mode, `python clone.py monza` learns your speed at every metre and writes `logs/clone_monza_2026.parquet`.
 
 ## Architecture
